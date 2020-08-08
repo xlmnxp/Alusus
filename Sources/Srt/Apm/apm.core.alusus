@@ -7,8 +7,7 @@ import "Srl/Net.alusus";
 import "Srl/Fs.alusus";
 import "Zip.alusus";
 
-@merge module Apm
-{
+@merge module Apm {
   use Srl;
   def fileName: array[Char, 250];
   def moduleName: array[Char, 250];
@@ -17,8 +16,7 @@ import "Zip.alusus";
   def globalPackageName: String;
   def localPackageName: String;
 
-  func importFile(packageName: ptr[array[Char]], requestedFile: ptr[array[Char]]): bool
-  {
+  func importFile(packageName: ptr[array[Char]], requestedFile: ptr[array[Char]]): bool {
     def homeDir: ptr[array[Char]] = System.getEnv("HOME")~cast[ptr[array[Char]]];
 
     if (String.find(packageName,'@') != 0){
@@ -49,15 +47,13 @@ import "Zip.alusus";
     };
 
     return 1;
-  };
+  }
 
-  func importFile(packageName: ptr[array[Char]]): bool
-  {
+  func importFile(packageName: ptr[array[Char]]): bool {
     return importFile(packageName, 0);
-  };
+  }
 
-  func installRelease(package: ptr[array[Char]], global: bool, logs: bool): Void
-  {
+  func installRelease(package: ptr[array[Char]], global: bool, logs: bool): Void {
     def result: ptr[array[Char]];
     def size: Int;
     def useLatestRelease: Bool;
@@ -71,26 +67,26 @@ import "Zip.alusus";
     };
 
     def requestUrl: array[Char, 500];
-    String.assign(
-      requestUrl~ptr, "https://api.github.com/repos/%s/%s/releases/latest", moduleAuthor~ptr, moduleName~ptr
-    );
+    String.assign(requestUrl~ptr, "https://api.github.com/repos/%s/%s/releases/latest", moduleAuthor~ptr, moduleName~ptr)
     if logs {
       Console.print(I18n.fetchingInfo, Console.Style.FG_BLUE, moduleName~ptr, requestUrl~ptr);
-    };
+    }
 
     if Net.get(requestUrl~ptr, result~ptr, size~ptr) {
       callbackWithPackageInfo(result, size, global, useLatestRelease, logs);
     } else {
       if logs {
         Console.print(I18n.fetchFailed, Console.Style.FG_RED);
-      };
-    };
+      }
+    }
 
     Memory.free(result);
-  };
+  }
 
-  func callbackWithPackageInfo (pkgInfo: ptr[array[Char]], size: Int, global: bool, useLatestRelease: bool, logs: bool)
-  {
+  func callbackWithPackageInfo (
+    pkgInfo: ptr[array[Char]], size: Int, global: bool,
+    useLatestRelease: bool, logs: bool
+    ) {
     def matches: Array[String] =
       Regex.match("https://github.com/([^/]*)/([^/].*)/releases/tag/([^\"]*)\",", pkgInfo, 1);
     if matches.getLength() == 4 {
@@ -98,15 +94,15 @@ import "Zip.alusus";
       String.assign(moduleName~ptr, "%s", matches(2).buf);
       if useLatestRelease {
         String.assign(moduleReleaseTag~ptr, "%s", matches(3).buf);
-      };
+      }
       if downloadModule(moduleAuthor~ptr, moduleName~ptr, moduleReleaseTag~ptr, global, useLatestRelease, logs) {
         if logs Console.print(I18n.fetchSuccessful, Console.Style.FG_BLUE);
       }
     } else if logs {
       Console.print(I18n.tagNotFound, Console.Style.FG_RED);
       Console.print(I18n.fetchFailed, Console.Style.FG_RED);
-    };
-  };
+    }
+  }
 
   func downloadModule(
     moduleAuthor: ptr[array[Char]], moduleName: ptr[array[Char]], moduleReleaseTag: ptr[array[Char]], global: bool,
@@ -133,43 +129,44 @@ import "Zip.alusus";
       String.assign(modulePath~ptr, "./.apm/%s/%s@%s", moduleAuthor, moduleName, moduleReleaseTag);
       String.assign(authorPath~ptr, "./.apm/%s", moduleAuthor);
       String.assign(dirOfAPMModulesDirectory~ptr, ".apm");
-    };
-    String.assign(symLinkPath~ptr, "%s/%s", authorPath~ptr, moduleName);
+    }
 
+    String.assign(symLinkPath~ptr, "%s/%s", authorPath~ptr, moduleName);
     String.assign(execCreateDirCommand~ptr, "mkdir -p %s", authorPath~ptr);
     String.assign(execCopyCommand~ptr, "cp -rf %s %s", folderInTempDirectory~ptr, modulePath~ptr);
-    String.assign(
-      execSymLinkCommand~ptr, "ln -s ./%s@%s %s", moduleName, moduleReleaseTag, symLinkPath~ptr
-    );
-    String.assign(
-      downloadLink~ptr, "https://github.com/%s/%s/archive/%s.zip", moduleAuthor, moduleName, moduleReleaseTag
-    );
+
+    // remove symLink if it exists
+    if (Fs.exists(symLinkPath~ptr))
+      Fs.remove(symLinkPath~ptr);
+    
+    String.assign(execSymLinkCommand~ptr, "ln -s ./%s@%s %s", moduleName, moduleReleaseTag, symLinkPath~ptr);
+    String.assign(downloadLink~ptr, "https://github.com/%s/%s/archive/%s.zip", moduleAuthor, moduleName, moduleReleaseTag);
 
 
     if (Fs.exists(modulePath~ptr)){
       if logs {
         Console.print(I18n.pkgAlreadyInstalled, Console.Style.FG_RED, modulePath~ptr);
-      };
+      }
 
       return 0;
-    };
+    }
 
     if logs {
       Console.print(I18n.installingPkg, Console.Style.FG_BLUE, moduleName, moduleReleaseTag);
       Console.print(I18n.pkgRequest, Console.Style.FG_BLUE, downloadLink~ptr);
       Console.print(I18n.downloadingPkg, Console.Style.FG_YELLOW, downloadLink~ptr, "/tmp/temp.zip");
-    };
+    }
 
     if Net.get(downloadLink~ptr, "/tmp/temp.zip") {
       if logs {
         Console.print(I18n.downloadedPkg, Console.Style.FG_BLUE);
         Console.print(I18n.unzipToTmp, Console.Style.FG_BLUE, "temp.zip", "/tmp/temp_zip/");
-      };
+      }
 
       if Zip.extractFromFile("/tmp/temp.zip", "/tmp/temp_zip", onFileExtracted~ptr, logs~ptr) == 0 {
         if logs {
           Console.print(I18n.archiveExtracted, Console.Style.FG_BLUE);
-        };
+        }
 
         if(Fs.exists(dirOfAPMModulesDirectory~ptr) || Fs.makeDir(dirOfAPMModulesDirectory~ptr)){
           if logs {
@@ -178,7 +175,7 @@ import "Zip.alusus";
             Console.print(
               I18n.copyPkg, Console.Style.FG_YELLOW, folderInTempDirectory~ptr, modulePath~ptr
             );
-          };
+          }
 
           System.exec(execCreateDirCommand~ptr);
           if(System.exec(execCopyCommand~ptr) == 0){
@@ -199,32 +196,31 @@ import "Zip.alusus";
           } else {
             if logs {
               Console.print(I18n.cannotMovePkg, Console.Style.FG_RED, dirOfAPMModulesDirectory~ptr);
-            };
-          };
+            }
+          }
         } else {
           if logs {
             Console.print(I18n.cannotCreatePkg, Console.Style.FG_RED, dirOfAPMModulesDirectory~ptr);
-          };
-        };
+          }
+        }
       } else {
         if logs {
           Console.print(I18n.cannotExtract, Console.Style.FG_RED, "temp.zip");
-        };
-      };
+        }
+      }
     } else {
       if logs {
         Console.print(I18n.cannotGet, Console.Style.FG_RED, downloadLink~ptr);
-      };
-    };
+      }
+    }
 
     return 0;
-  };
+  }
 
-  func onFileExtracted(fname: ptr[array[Char]], logs: ptr): Int
-  {
+  func onFileExtracted(fname: ptr[array[Char]], logs: ptr): Int {
     if(logs~cast[ptr[bool]]~cnt == 1){
       Console.print(I18n.fileExtracted, Console.Style.FG_GREEN, fname);
-    };
+    }
     return 0;
-  };
+  }
 };
